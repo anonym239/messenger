@@ -134,6 +134,7 @@ private fun MainLayout(issues: RadioIssues, actions: UiActions) {
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 600.dp
+        val listWidth = if (maxWidth > 900.dp) 380.dp else 320.dp
         val tabs = listOf(
             Triple("Chats", Icons.Default.Email, 0),
             Triple("SOS", Icons.Default.Warning, 1),
@@ -151,7 +152,7 @@ private fun MainLayout(issues: RadioIssues, actions: UiActions) {
                 Box(Modifier.weight(1f)) {
                     when (tab) {
                         0 -> Row(Modifier.fillMaxSize()) {
-                            Box(Modifier.width(if (maxWidth > 900.dp) 380.dp else 320.dp)) {
+                            Box(Modifier.width(listWidth)) {
                                 PeerListScreen(issues, actions, selected = openPeer, onOpen = { openPeer = it })
                             }
                             VerticalDivider()
