@@ -78,12 +78,13 @@ class UiSmokeTest {
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("messageField").fetchSemanticsNodes().isNotEmpty() }
 
         // Chat ist offen -> Nachricht senden
-        compose.onNodeWithTag("messageField").performTextInput("Hallo, hört mich jemand?")
+        val gruss = "Hallo, hört mich jemand? #${System.currentTimeMillis() % 1000}"
+        compose.onNodeWithTag("messageField").performTextInput(gruss)
         compose.onNodeWithTag("sendButton").performClick()
-        compose.onNodeWithText("Hallo, hört mich jemand?").assertExists()
+        compose.onNodeWithText(gruss).assertExists()
         // Antwort simulieren
         compose.runOnUiThread {
-            Mesh.state.addMessage(ChatMessage("x1", other.myId, "Ja! Wir sind 200 m nördlich von dir.", System.currentTimeMillis(), mine = false))
+            Mesh.state.addMessage(ChatMessage("x1" + System.nanoTime(), other.myId, "Ja! Wir sind 200 m nördlich von dir.", System.currentTimeMillis(), mine = false))
             Mesh.state.putDevice(Mesh.state.devices.value[other.myId]!!.copy(lastSeen = System.currentTimeMillis(), hops = 1))
         }
         shot("05_chat")
@@ -96,7 +97,7 @@ class UiSmokeTest {
         compose.onNodeWithTag("messageField").performTextInput("Hallo an alle!")
         compose.onNodeWithTag("sendButton").performClick()
         compose.runOnUiThread {
-            Mesh.state.addMessage(ChatMessage("x2", PUBLIC_CHANNEL, "Hier Gruppe Süd, alles ok.", System.currentTimeMillis(),
+            Mesh.state.addMessage(ChatMessage("x2" + System.nanoTime(), PUBLIC_CHANNEL, "Hier Gruppe Süd, alles ok.", System.currentTimeMillis(),
                 mine = false, senderName = "Jonas"))
         }
         shot("06_kanal")
