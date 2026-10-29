@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -119,11 +120,15 @@ fun MeshApp(issues: RadioIssues, actions: UiActions) {
 private fun Onboarding(onDone: (String) -> Unit) {
     var input by rememberSaveable { mutableStateOf("") }
     val focus = remember { FocusRequester() }
+    val scroll = rememberScrollState()
     LaunchedEffect(Unit) { delay(300); runCatching { focus.requestFocus() } }
+    // Tastatur offen -> nach unten scrollen, damit Eingabefeld und Knopf sichtbar bleiben
+    val imeOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    LaunchedEffect(imeOpen, scroll.maxValue) { if (imeOpen) scroll.animateScrollTo(scroll.maxValue) }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
-            Modifier.fillMaxSize().systemBarsPadding().imePadding().verticalScroll(rememberScrollState())
+            Modifier.fillMaxSize().systemBarsPadding().imePadding().verticalScroll(scroll)
                 .padding(horizontal = 24.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {

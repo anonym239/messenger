@@ -59,6 +59,8 @@ class UiSmokeTest {
             compose.onNodeWithTag("nameField").assertTextContains("Testerin")
             compose.onAllNodesWithText("Testerin").assertCountEquals(2)   // Feld + Vorschau
             shot("02_name_eingegeben")
+            compose.onNodeWithTag("startButton").performScrollTo().assertIsDisplayed()
+            shot("02b_knopf_sichtbar")
             compose.onNodeWithTag("startButton").performClick()
         }
         compose.waitUntil(20_000) { compose.onAllNodesWithTag("peerList").fetchSemanticsNodes().isNotEmpty() }
