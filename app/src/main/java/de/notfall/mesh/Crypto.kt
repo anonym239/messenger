@@ -24,99 +24,97 @@ import java.security.MessageDigest
  * - Signatur: Ed25519. Der Absender steckt INNERHALB des Chiffrats, deshalb sehen
  *   weiterleitende Handys weder Absender noch Empfänger noch Inhalt.
  * - Auffüllen auf 512-Byte-Blöcke, damit die Länge wenig über den Inhalt verrät.
- * - Private Schlüssel liegen verschlüsselt mit einem Schlüssel aus dem Android-Keystore
- *   (Hardware-geschützt, wo das Gerät es unterstützt).
+ * - Private Schlüssel liegen verschlüsselt mit einem Schlüssel aus dem Android-Keystore.
  */
-class Crypto(ctx: Context) {
+class Crypto(ctx: Context, storeName: String = "notfall_keys") {
 
     private val encKeys: KeysetHandle
     private val signKeys: KeysetHandle
+    private val decryptor: HybridDecrypt
+    private val signer: PublicKeySign
+    private val encryptors = HashMap<String, HybridEncrypt>()
+    private val verifiers = HashMap<String, PublicKeyVerify>()
 
-    /** Öffentliche Identität (Base64). Wird mit Kontakten ausgetauscht. */
+    /** Öffentliche Identität (Base64). Wird automatisch per HELLO verteilt. */
     val myId: String
 
     init {
         HybridConfig.register()
         SignatureConfig.register()
         // _RAW: kein Schlüssel-Präfix im Chiffrat, sonst wäre der Empfänger erkennbar
-        encKeys = loadOrCreate(ctx, "enc", "DHKEM_X25519_HKDF_SHA256_HKDF_SHA256_CHACHA20_POLY1305_RAW")
-        signKeys = loadOrCreate(ctx, "sign", "ED25519")
+        encKeys = loadOrCreate(ctx, storeName, "enc", "DHKEM_X25519_HKDF_SHA256_HKDF_SHA256_CHACHA20_POLY1305_RAW")
+        signKeys = loadOrCreate(ctx, storeName, "sign", "ED25519")
+        @Suppress("DEPRECATION")
+        decryptor = encKeys.getPrimitive(HybridDecrypt::class.java)
+        @Suppress("DEPRECATION")
+        signer = signKeys.getPrimitive(PublicKeySign::class.java)
         val id = JSONObject()
             .put("e", b64(TinkProtoKeysetFormat.serializeKeysetWithoutSecret(encKeys.publicKeysetHandle)))
             .put("s", b64(TinkProtoKeysetFormat.serializeKeysetWithoutSecret(signKeys.publicKeysetHandle)))
         myId = b64(id.toString().toByteArray())
     }
 
-    /** Verschlüsselt eine Chat-Nachricht für genau einen Empfänger. */
-    fun encrypt(recipientId: String, text: String): ByteArray {
-        val ts = System.currentTimeMillis()
+    /** Verschlüsselt [content] so, dass nur [recipientId] es lesen kann. */
+    fun seal(recipientId: String, content: JSONObject): ByteArray {
+        val c = content.toString()
         val inner = JSONObject()
             .put("from", myId)
-            .put("ts", ts)
-            .put("text", text)
-            .put("sig", b64(sign(signedBytes("MSG", myId, ts, text))))
-        val enc = publicKey(recipientId, "e").getPrimitive(HybridEncrypt::class.java)
-        return enc.encrypt(pad(inner.toString().toByteArray()), CONTEXT)
+            .put("c", c)
+            .put("sig", b64(signer.sign("MSG|$myId|$c".toByteArray())))
+        return encryptor(recipientId).encrypt(pad(inner.toString().toByteArray()), CONTEXT)
     }
 
-    /** Versucht eine Nachricht zu entschlüsseln. null = nicht für mich (nur weiterleiten). */
-    fun decrypt(blob: ByteArray): ChatMessage? = try {
-        val dec = encKeys.getPrimitive(HybridDecrypt::class.java)
-        val o = JSONObject(String(unpad(dec.decrypt(blob, CONTEXT))))
+    /** Entschlüsselt und prüft die Signatur. null = nicht für mich (nur weiterleiten). */
+    fun open(blob: ByteArray): Pair<String, JSONObject>? = try {
+        val o = JSONObject(String(unpad(decryptor.decrypt(blob, CONTEXT))))
         val from = o.getString("from")
-        val ts = o.getLong("ts")
-        val text = o.getString("text")
-        verify(from, unb64(o.getString("sig")), signedBytes("MSG", from, ts, text))
-        ChatMessage(from = from, text = text, ts = ts)
+        val c = o.getString("c")
+        verifier(from).verify(unb64(o.getString("sig")), "MSG|$from|$c".toByteArray())
+        from to JSONObject(c)
     } catch (e: Exception) {
         null
     }
 
-    /**
-     * SOS ist absichtlich NICHT verschlüsselt: Jeder (auch Fremde, Bergwacht, Polizei)
-     * soll es lesen und weitergeben können. Es ist aber signiert, damit es unterwegs
-     * nicht verändert werden kann.
-     */
-    fun signSos(text: String, lat: Double?, lon: Double?): ByteArray {
-        val ts = System.currentTimeMillis()
-        val pos = if (lat != null && lon != null) "%.5f,%.5f".format(java.util.Locale.ROOT, lat, lon) else ""
-        val body = "$text|$pos"
+    /** Offen lesbar, aber signiert (für HELLO und SOS – jeder soll es lesen können). */
+    fun signPublic(type: String, content: JSONObject): ByteArray {
+        val c = content.toString()
         return JSONObject()
-            .put("from", myId).put("ts", ts).put("text", text).put("pos", pos)
-            .put("sig", b64(sign(signedBytes("SOS", myId, ts, body))))
+            .put("from", myId)
+            .put("c", c)
+            .put("sig", b64(signer.sign("$type|$myId|$c".toByteArray())))
             .toString().toByteArray()
     }
 
-    fun verifySos(blob: ByteArray): ChatMessage? = try {
+    fun verifyPublic(type: String, blob: ByteArray): Pair<String, JSONObject>? = try {
         val o = JSONObject(String(blob))
         val from = o.getString("from")
-        val ts = o.getLong("ts")
-        val text = o.getString("text")
-        val pos = o.getString("pos")
-        verify(from, unb64(o.getString("sig")), signedBytes("SOS", from, ts, "$text|$pos"))
-        ChatMessage(from = from, text = text, ts = ts, sos = true, position = pos.ifEmpty { null })
+        val c = o.getString("c")
+        verifier(from).verify(unb64(o.getString("sig")), "$type|$from|$c".toByteArray())
+        from to JSONObject(c)
     } catch (e: Exception) {
         null
     }
 
-    private fun sign(data: ByteArray) = signKeys.getPrimitive(PublicKeySign::class.java).sign(data)
+    @Suppress("DEPRECATION")
+    private fun encryptor(id: String) = encryptors.getOrPut(id) {
+        publicKey(id, "e").getPrimitive(HybridEncrypt::class.java)
+    }
 
-    private fun verify(senderId: String, sig: ByteArray, data: ByteArray) =
-        publicKey(senderId, "s").getPrimitive(PublicKeyVerify::class.java).verify(sig, data)
-
-    private fun signedBytes(type: String, from: String, ts: Long, text: String) =
-        "$type|$from|$ts|$text".toByteArray()
+    @Suppress("DEPRECATION")
+    private fun verifier(id: String) = verifiers.getOrPut(id) {
+        publicKey(id, "s").getPrimitive(PublicKeyVerify::class.java)
+    }
 
     private fun publicKey(id: String, part: String): KeysetHandle {
         val o = JSONObject(String(unb64(id)))
         return TinkProtoKeysetFormat.parseKeysetWithoutSecret(unb64(o.getString(part)))
     }
 
-    private fun loadOrCreate(ctx: Context, name: String, template: String): KeysetHandle =
+    private fun loadOrCreate(ctx: Context, store: String, name: String, template: String): KeysetHandle =
         AndroidKeysetManager.Builder()
-            .withSharedPref(ctx, name, "notfall_keys")
+            .withSharedPref(ctx, name, store)
             .withKeyTemplate(KeyTemplates.get(template))
-            .withMasterKeyUri("android-keystore://notfall_master")
+            .withMasterKeyUri("android-keystore://${store}_master")
             .build()
             .keysetHandle
 
