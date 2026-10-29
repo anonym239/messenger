@@ -129,6 +129,29 @@ class MeshRouterTest {
     }
 
     @Test
+    fun kanalAlle_erreichtJeden_kontaktVonHand() {
+        val net = FakeNet()
+        val inboxC = mutableListOf<ChatMessage>()
+        val a = net.node("a", crypto("a"))
+        val b = net.node("b", crypto("b"))
+        val c = net.node("c", crypto("c"), inboxC)
+        net.link("a", "b"); net.link("b", "c")
+        a.sendPublic("Treffpunkt Hütte")
+        net.run()
+        assertEquals("Treffpunkt Hütte", inboxC.single { it.peer == PUBLIC_CHANNEL }.text)
+        assertEquals("A", inboxC.single { it.peer == PUBLIC_CHANNEL }.senderName)
+
+        // Kontakt von Hand: gültige ID ok, Unsinn/eigene ID abgelehnt
+        assertTrue(a.addContact(c.myId, "Carla"))
+        assertEquals("Carla", a.state.devices.value[c.myId]!!.display)
+        assertFalse(a.addContact("kaputt", "X"))
+        assertFalse(a.addContact(a.myId, "Ich"))
+        // Name aus HELLO überschreibt den eigenen Namen für den Kontakt nicht
+        c.announce(); net.run()
+        assertEquals("Carla", a.state.devices.value[c.myId]!!.display)
+    }
+
+    @Test
     fun sos_erreichtAlleUndKeineEndlosschleife() {
         val net = FakeNet()
         val names = listOf("a", "b", "c", "d")

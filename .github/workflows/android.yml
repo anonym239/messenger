@@ -43,12 +43,15 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
-          script: gradle --no-daemon connectedDebugAndroidTest || (adb logcat -d | grep -A40 "FATAL EXCEPTION" | head -80 | sed 's/^/::error::/'; exit 1)
-      - name: Fehlgeschlagene Tests anzeigen
-        if: failure()
+          script: bash .github/scripts/emulator-tests.sh
+      - name: Screenshots veröffentlichen (Branch "screenshots")
+        if: always() && github.event_name == 'push'
         run: |
-          find app/build/outputs/androidTest-results -name "*.xml" -exec grep -h -A6 "<failure" {} \; 2>/dev/null | head -60 | sed 's/^/::error::/' || true
-          grep -rh -E "^e: |What went wrong" -A6 /home/runner/.gradle 2>/dev/null | head -5 || true
+          [ -d screens ] || exit 0
+          cd screens
+          git init -q && git checkout -q -b screenshots
+          git add -A && git -c user.name=ci -c user.email=ci@localhost commit -qm "Screenshots ${{ github.sha }}" || exit 0
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" screenshots
       - uses: actions/upload-artifact@v5
         if: always()
         with:

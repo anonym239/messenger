@@ -1,7 +1,9 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <group android:translateX="30" android:translateY="30">
-        <path android:fillColor="#FFFFFF"
-            android:pathData="M24,6a6,6 0,1 1,0 12a6,6 0,1 1,0 -12zM10,30a6,6 0,1 1,0 12a6,6 0,1 1,0 -12zM38,30a6,6 0,1 1,0 12a6,6 0,1 1,0 -12zM22.4,17.2l3.2,0l-10,15.2l-2.8,-1.8zM25.6,17.2l-3.2,0l10,15.2l2.8,-1.8zM15,34.6h18v2.8h-18z"/>
-    </group>
+    <!-- Dreieck (abgerundet), sichtbarer Bereich ist der innere Kreis mit ~66dp -->
+    <path android:fillColor="#FFB300" android:strokeColor="#FFB300" android:strokeWidth="5" android:strokeLineJoin="round"
+        android:pathData="M54,28 L80,74 L28,74 Z"/>
+    <!-- Ausrufezeichen -->
+    <path android:fillColor="#263238" android:pathData="M51,42 h6 l-1,18 h-4 z"/>
+    <path android:fillColor="#263238" android:pathData="M54,63.5 m-3.5,0 a3.5,3.5 0,1 1,7 0 a3.5,3.5 0,1 1,-7 0"/>
 </vector>

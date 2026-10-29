@@ -4,12 +4,15 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.location.LocationManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -26,7 +29,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.delay
 import java.io.File
 
@@ -34,66 +38,84 @@ private val LightColors = lightColorScheme(
     primary = Color(0xFF00695C), onPrimary = Color.White,
     primaryContainer = Color(0xFFB2DFDB), onPrimaryContainer = Color(0xFF00201C),
     secondaryContainer = Color(0xFFDDEFEC), onSecondaryContainer = Color(0xFF0E1F1D),
-    background = Color(0xFFF6FAF9), surface = Color(0xFFF6FAF9),
+    background = Color(0xFFF6FAF9), onBackground = Color(0xFF161D1C),
+    surface = Color(0xFFF6FAF9), onSurface = Color(0xFF161D1C),
+    surfaceVariant = Color(0xFFDAE5E2), onSurfaceVariant = Color(0xFF3F4947),
 )
 private val DarkColors = darkColorScheme(
     primary = Color(0xFF80CBC4), onPrimary = Color(0xFF00332E),
     primaryContainer = Color(0xFF004D40), onPrimaryContainer = Color(0xFFB2DFDB),
     secondaryContainer = Color(0xFF233B38), onSecondaryContainer = Color(0xFFDDEFEC),
-    background = Color(0xFF0F1514), surface = Color(0xFF0F1514),
+    background = Color(0xFF0F1514), onBackground = Color(0xFFDDE4E2),
+    surface = Color(0xFF0F1514), onSurface = Color(0xFFDDE4E2),
+    surfaceVariant = Color(0xFF3F4947), onSurfaceVariant = Color(0xFFBEC9C6),
 )
 
 class MainActivity : ComponentActivity() {
 
-    private val permissions = buildList {
-        add(Manifest.permission.ACCESS_FINE_LOCATION)
-        add(Manifest.permission.ACCESS_COARSE_LOCATION)
-        if (Build.VERSION.SDK_INT >= 31) {
-            add(Manifest.permission.BLUETOOTH_SCAN)
-            add(Manifest.permission.BLUETOOTH_ADVERTISE)
-            add(Manifest.permission.BLUETOOTH_CONNECT)
-        }
-        if (Build.VERSION.SDK_INT >= 33) {
-            add(Manifest.permission.NEARBY_WIFI_DEVICES)
-            add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-    }.toTypedArray()
+    private val permissions = (MeshService.requiredPermissions() +
+        if (Build.VERSION.SDK_INT >= 33) listOf(Manifest.permission.POST_NOTIFICATIONS) else emptyList()).toTypedArray()
 
     private val askPermissions =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { startMesh() }
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            // Nach dem Erlauben den Funk komplett neu starten, damit alte Fehler verschwinden
+            startMesh(restart = true)
+        }
 
     private val askBluetooth =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { startMesh() }
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { startMesh(restart = true) }
+
+    private var onScanned: ((String) -> Unit)? = null
+    private val scanner = registerForActivityResult(ScanContract()) { r ->
+        r.contents?.let { onScanned?.invoke(it) }
+        onScanned = null
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        if (!hasPermissions()) askPermissions.launch(permissions)
+        if (!MeshService.hasPermissions(this)) askPermissions.launch(permissions)
 
         val actions = UiActions(
             requestPermissions = { askPermissions.launch(permissions) },
+            openAppSettings = {
+                safeStart(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+            },
             enableBluetooth = ::enableBluetooth,
             openLocationSettings = { safeStart(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) },
-            startMesh = ::startMesh,
+            startMesh = { startMesh(restart = true) },
+            retryRadio = { startMesh(restart = true) },
             sendSos = { text ->
                 val pos = lastPosition()
                 try { Mesh.router.sendSos(text, pos?.first, pos?.second) } catch (_: Exception) { }
             },
             share = ::share,
+            copy = { text ->
+                getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Notfall-Mesh", text))
+                Toast.makeText(this, "Kopiert", Toast.LENGTH_SHORT).show()
+            },
+            scanQr = { callback ->
+                onScanned = callback
+                try {
+                    scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                        .setPrompt("QR-Code des anderen Handys scannen").setBeepEnabled(false).setOrientationLocked(false))
+                } catch (_: Exception) {
+                    Toast.makeText(this, "Kamera nicht verfügbar", Toast.LENGTH_SHORT).show()
+                }
+            },
         )
 
         setContent {
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors) {
                 var issues by remember { mutableStateOf(RadioIssues()) }
-                val radioError by MeshService.radioError.collectAsState()
                 // Funkvoraussetzungen regelmäßig prüfen
                 LaunchedEffect(Unit) {
                     while (true) {
-                        issues = RadioIssues(!hasPermissions(), !bluetoothOn(), !locationOn(), null)
-                        delay(3000)
+                        issues = RadioIssues(!MeshService.hasPermissions(this@MainActivity), !bluetoothOn(), !locationOn())
+                        delay(2000)
                     }
                 }
-                MeshApp(issues.copy(error = radioError), actions)
+                MeshApp(issues, actions)
                 CrashReport()
             }
         }
@@ -102,19 +124,13 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         // Beim Öffnen sofort "Ich bin da" senden (und Dienst starten, falls nötig)
-        startMesh()
+        startMesh(restart = false)
     }
 
-    private fun startMesh() {
+    private fun startMesh(restart: Boolean) {
         if (Mesh.name.isBlank()) return
-        try {
-            ContextCompat.startForegroundService(this, Intent(this, MeshService::class.java))
-        } catch (_: Exception) { }
+        MeshService.start(this, restart)
     }
-
-    private fun hasPermissions() = permissions
-        .filter { it != Manifest.permission.POST_NOTIFICATIONS && it != Manifest.permission.ACCESS_COARSE_LOCATION }
-        .all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
 
     private fun bluetoothOn(): Boolean = try {
         getSystemService(BluetoothManager::class.java)?.adapter?.isEnabled ?: true
@@ -129,6 +145,7 @@ class MainActivity : ComponentActivity() {
         true
     }
 
+    @SuppressLint("MissingPermission")
     private fun enableBluetooth() {
         try {
             askBluetooth.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))

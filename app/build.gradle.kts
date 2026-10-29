@@ -54,6 +54,8 @@ dependencies {
     implementation("com.google.android.gms:play-services-nearby:19.3.0")
     // Kryptografie: X25519 + ChaCha20-Poly1305 (HPKE) und Ed25519-Signaturen
     implementation("com.google.crypto.tink:tink-android:1.15.0")
+    // QR-Codes erzeugen und scannen (funktioniert komplett offline)
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))
     implementation("androidx.compose.material3:material3")

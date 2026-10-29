@@ -95,6 +95,13 @@ class Crypto(ctx: Context, storeName: String = "notfall_keys") {
         null
     }
 
+    /** Prüft, ob [id] eine gültige Notfall-Mesh-ID ist (z. B. nach Einfügen oder QR-Scan). */
+    fun isValidId(id: String): Boolean = try {
+        encryptor(id); verifier(id); true
+    } catch (e: Exception) {
+        false
+    }
+
     @Suppress("DEPRECATION")
     private fun encryptor(id: String) = encryptors.getOrPut(id) {
         publicKey(id, "e").getPrimitive(HybridEncrypt::class.java)

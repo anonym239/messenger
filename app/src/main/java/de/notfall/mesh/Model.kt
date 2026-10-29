@@ -49,12 +49,18 @@ data class ChatMessage(
 
 data class Device(
     val id: String,
-    val name: String,
-    val lastSeen: Long,
+    val name: String,          // Name, den das Gerät selbst sendet
+    val lastSeen: Long,        // 0 = noch nie per Funk gesehen
     val hops: Int,             // 0 = direkt verbunden, 1 = über ein anderes Handy, …
+    val alias: String? = null, // eigener Name für den Kontakt (überschreibt [name])
+    val saved: Boolean = false,// von Hand hinzugefügt / gespeichert
 ) {
-    fun online(now: Long = System.currentTimeMillis()) = now - lastSeen < MeshRouter.ONLINE_MS
+    val display get() = alias?.takeIf { it.isNotBlank() } ?: name
+    fun online(now: Long = System.currentTimeMillis()) = lastSeen > 0 && now - lastSeen < MeshRouter.ONLINE_MS
 }
+
+/** Gesprächspartner-ID für den öffentlichen Kanal "Alle in der Nähe". */
+const val PUBLIC_CHANNEL = "ALLE"
 
 /** Zustand, den die Oberfläche anzeigt. Wird in einer Datei gespeichert (null = nur im Speicher). */
 class MeshState(private val file: File? = null) {
@@ -86,6 +92,16 @@ class MeshState(private val file: File? = null) {
         save()
     }
 
+    fun deleteChat(peer: String) {
+        messages.value = messages.value.filter { it.peer != peer || it.sos }
+        save()
+    }
+
+    fun removeDevice(id: String) {
+        devices.value = devices.value - id
+        save()
+    }
+
     fun markRead(peer: String) {
         lastRead.value = lastRead.value + (peer to System.currentTimeMillis())
     }
@@ -106,7 +122,8 @@ class MeshState(private val file: File? = null) {
             }
             val devs = JSONArray()
             devices.value.values.forEach {
-                devs.put(JSONObject().put("id", it.id).put("name", it.name).put("seen", it.lastSeen).put("hops", it.hops))
+                devs.put(JSONObject().put("id", it.id).put("name", it.name).put("seen", it.lastSeen).put("hops", it.hops)
+                    .put("alias", it.alias ?: "").put("saved", it.saved))
             }
             f.writeText(JSONObject().put("messages", msgs).put("devices", devs).toString())
         } catch (_: Exception) { }
@@ -127,7 +144,8 @@ class MeshState(private val file: File? = null) {
             val devs = o.getJSONArray("devices")
             devices.value = (0 until devs.length()).associate { i ->
                 val d = devs.getJSONObject(i)
-                d.getString("id") to Device(d.getString("id"), d.getString("name"), d.getLong("seen"), d.getInt("hops"))
+                d.getString("id") to Device(d.getString("id"), d.getString("name"), d.getLong("seen"), d.getInt("hops"),
+                    d.optString("alias").ifEmpty { null }, d.optBoolean("saved"))
             }
         } catch (_: Exception) { }
     }

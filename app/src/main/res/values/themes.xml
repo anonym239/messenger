@@ -1,0 +1,7 @@
+<resources>
+    <!-- Hintergrund passend zur App, damit beim Start nichts weiß/schwarz aufblitzt -->
+    <style name="AppTheme" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/app_bg</item>
+        <item name="android:colorAccent">#00695C</item>
+    </style>
+</resources>
