@@ -2,8 +2,7 @@ name: APK bauen
 
 on:
   push:
-    branches: [main]
-    tags: ["v*"]          # Neues Release: git tag v1.0.0 && git push origin v1.0.0
+    branches: [main]      # Neues Release: Zahl in version.txt erhöhen und pushen
   pull_request:
   workflow_dispatch:
 
@@ -37,11 +36,15 @@ jobs:
           fi
 
       - name: Versionsnummer bestimmen
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "VERSION_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-          else
-            echo "VERSION_NAME=0.0.${{ github.run_number }}-dev" >> "$GITHUB_ENV"
+          VERSION=$(tr -d '[:space:]' < version.txt)
+          echo "VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
+          # Release nur auf main und nur, wenn es diese Version noch nicht gibt
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ] \
+             && ! gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "DO_RELEASE=true" >> "$GITHUB_ENV"
           fi
 
       - name: APK bauen
@@ -66,8 +69,11 @@ jobs:
           path: NotfallMesh-*.apk
 
       - name: GitHub-Release mit APK erstellen
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: env.DO_RELEASE == 'true'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ env.VERSION_NAME }}
+          name: Notfall-Mesh ${{ env.VERSION_NAME }}
+          target_commitish: ${{ github.sha }}
           files: NotfallMesh-*.apk
           generate_release_notes: true

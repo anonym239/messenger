@@ -40,15 +40,9 @@ Wichtig:
 
 ## Neue Version veröffentlichen
 
-Jeder Push auf `main` baut automatisch eine Test-APK (unter *Actions* → Lauf → *Artifacts*).
-Für ein offizielles Release einen Tag setzen:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-GitHub Actions baut dann die APK und erstellt automatisch ein Release mit `NotfallMesh-1.0.0.apk`.
+Jeder Push auf `main` baut automatisch die APK (unter *Actions* → Lauf → *Artifacts*).
+Für ein neues Release die Zahl in `version.txt` erhöhen (z. B. `1.0.0` → `1.1.0`) und auf `main` pushen.
+GitHub Actions erstellt dann automatisch den Tag `v1.1.0` und ein Release mit `NotfallMesh-1.1.0.apk`.
 
 ### Einmalig: Signaturschlüssel einrichten (wichtig für Updates)
 
