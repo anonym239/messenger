@@ -34,14 +34,28 @@ Wichtig:
 ## Benutzung
 
 1. APK unter **Releases** herunterladen und installieren. Dafür muss die Installation aus unbekannten Quellen erlaubt sein.
-2. Alle Berechtigungen erlauben (Bluetooth, Geräte in der Nähe, Standort, Benachrichtigungen).
-3. „Meine ID kopieren“ und die ID an Freunde geben. Deren ID unter „Kontakt hinzufügen“ eintragen.
-4. Am besten von Angesicht zu Angesicht den **Fingerabdruck** vergleichen. So weißt du sicher, dass die ID echt ist.
+2. Beim ersten Start den **Namen** eingeben und alle Berechtigungen erlauben.
+3. Die App sendet beim Öffnen und danach jede Minute ein „Ich bin da“-Signal. Andere Handys mit der App zeigen dich automatisch unter **In der Nähe** an, mit einem Hinweis „Neues Gerät“. Antippen, und ihr könnt sofort chatten.
+4. **Flugmodus:** Das ist erlaubt. Danach Bluetooth (und am besten WLAN) wieder einschalten. Internet wird nicht gebraucht.
+5. Häkchen an der Nachricht: 🕓 wartet auf ein Gerät · ✓ an ein Handy weitergegeben · ✓✓ beim Empfänger angekommen.
+6. Für maximale Sicherheit die **Sicherheitsnummer** im Chat (ⓘ) mit der Nummer auf dem anderen Handy (Reiter „Ich“) vergleichen.
+7. Stürzt die App ab, wird beim nächsten Start ein Fehlerbericht angezeigt, den man teilen kann.
+
+## Tests
+
+Vor jedem Release laufen auf GitHub automatisch Tests auf einem Android-Emulator:
+- Verschlüsselung: Nur der Empfänger kann lesen, veränderte Nachrichten werden abgelehnt.
+- Weiterleitung A → B → C, wobei B nichts lesen kann. Die Zustellbestätigung kommt zurück.
+- Store and Forward: Die Nachricht wird später zugestellt, wenn das Zwischenhandy den Empfänger trifft.
+- SOS erreicht alle Handys, ohne Endlosschleife.
+- Oberfläche: Start, Namenseingabe, Chat öffnen, senden und alle Reiter, ohne Absturz.
+
+Nicht automatisch testbar ist der echte Funk zwischen zwei Handys. Den bitte mit zwei oder drei echten Geräten ausprobieren.
 
 ## Neue Version veröffentlichen
 
 Jeder Push auf `main` baut automatisch die APK (unter *Actions* → Lauf → *Artifacts*).
-Für ein neues Release die Zahl in `version.txt` erhöhen (z. B. `1.0.0` → `1.1.0`) und auf `main` pushen.
+Ein neues Release gibt es nur, wenn die Tests bestanden sind. Dafür die Zahl in `version.txt` erhöhen (z. B. `1.0.0` → `1.1.0`) und auf `main` pushen.
 GitHub Actions erstellt dann automatisch den Tag `v1.1.0` und ein Release mit `NotfallMesh-1.1.0.apk`.
 
 ### Einmalig: Signaturschlüssel einrichten (wichtig für Updates)
