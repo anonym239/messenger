@@ -66,6 +66,7 @@ class MainActivity : ComponentActivity() {
         null
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     private fun App() {
         val prefs = remember { getSharedPreferences("contacts", Context.MODE_PRIVATE) }
