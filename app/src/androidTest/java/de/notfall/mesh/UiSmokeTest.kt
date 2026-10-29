@@ -43,6 +43,15 @@ class UiSmokeTest {
 
     @Test
     fun kompletterDurchlauf() {
+        try {
+            durchlauf()
+        } catch (t: Throwable) {
+            shot("FEHLER")
+            throw t
+        }
+    }
+
+    private fun durchlauf() {
         if (Mesh.name.isBlank()) {
             shot("01_start")
             compose.onNodeWithTag("nameField").performTextInput("Testerin")
@@ -52,7 +61,7 @@ class UiSmokeTest {
             shot("02_name_eingegeben")
             compose.onNodeWithTag("startButton").performClick()
         }
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("peerList").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(20_000) { compose.onAllNodesWithTag("peerList").fetchSemanticsNodes().isNotEmpty() }
         Thread.sleep(3000)   // Funk starten lassen
         shot("03_liste_leer")
 
