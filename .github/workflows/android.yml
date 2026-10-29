@@ -24,6 +24,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: "8.10.2"
+      - name: App und Tests kompilieren
+        run: |
+          set -o pipefail
+          if ! gradle --no-daemon assembleDebug assembleDebugAndroidTest 2>&1 | tee build.log; then
+            grep -E -A6 "^e: |What went wrong|error:" build.log | grep -v "^> Task" | head -40 | while IFS= read -r l; do echo "::error::$l"; done
+            exit 1
+          fi
       - name: KVM aktivieren (schneller Emulator)
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
