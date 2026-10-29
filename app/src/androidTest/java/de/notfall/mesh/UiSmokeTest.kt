@@ -60,8 +60,11 @@ class UiSmokeTest {
         val other = Crypto(compose.activity, "test_ui_peer")
         compose.onNodeWithTag("addContact").performClick()
         shot("04_kontakt_hinzufuegen")
-        compose.onNodeWithText("Code / ID einfügen").performTextInput(Invite.create("Bergwacht", other.myId))
-        compose.onNodeWithText("Speichern").performClick()
+        compose.onNodeWithTag("codeField").performScrollTo().performTextInput(Invite.create("Bergwacht", other.myId))
+        compose.onNodeWithTag("saveContact").performScrollTo()
+        shot("04b_kontakt_code_eingefuegt")
+        compose.onNodeWithTag("saveContact").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("messageField").fetchSemanticsNodes().isNotEmpty() }
 
         // Chat ist offen -> Nachricht senden
         compose.onNodeWithTag("messageField").performTextInput("Hallo, hört mich jemand?")

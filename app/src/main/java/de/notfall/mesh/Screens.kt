@@ -477,7 +477,7 @@ private fun AddContactDialog(actions: UiActions, onDismiss: () -> Unit, onAdded:
 
                 Text("1. Dein Code: vom anderen Handy scannen lassen", style = MaterialTheme.typography.titleSmall)
                 Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
-                    QrCode(myInvite, 200.dp)
+                    QrCode(myInvite, 180.dp)
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                     TextButton(onClick = { actions.copy(myInvite) }) { Text("Kopieren") }
@@ -498,14 +498,14 @@ private fun AddContactDialog(actions: UiActions, onDismiss: () -> Unit, onAdded:
                     modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(code, { apply(it) }, label = { Text("Code / ID einfügen") }, maxLines = 3,
                     isError = error != null, supportingText = error?.let { { Text(it) } },
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("codeField"))
                 if (code.isNotBlank() && error == null) {
                     Text("Sicherheitsnummer: ${Crypto.fingerprint(code.trim())}", style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace, modifier = Modifier.padding(top = 4.dp))
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text("Abbrechen") }
-                    Button(enabled = code.isNotBlank(), onClick = {
+                    Button(enabled = code.isNotBlank(), modifier = Modifier.testTag("saveContact"), onClick = {
                         val id = code.trim()
                         when {
                             id == Mesh.router.myId -> error = "Das ist dein eigener Code."
