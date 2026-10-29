@@ -55,7 +55,7 @@ jobs:
               -PversionCode=${{ github.run_number }} \
               -PversionName="$VERSION_NAME" 2>&1 | tee build.log; then
             # Fehler als Annotation ausgeben, damit sie direkt in der Übersicht stehen
-            grep -E "^e: |What went wrong|^> |error:" build.log | head -30 | while IFS= read -r l; do echo "::error::$l"; done
+            grep -E -A6 "^e: |What went wrong|error:" build.log | grep -v "^> Task" | head -40 | while IFS= read -r l; do echo "::error::$l"; done
             exit 1
           fi
           cp app/build/outputs/apk/release/app-release.apk "NotfallMesh-$VERSION_NAME.apk"
