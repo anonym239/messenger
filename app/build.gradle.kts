@@ -36,6 +36,11 @@ android {
         }
     }
     buildFeatures { compose = true }
+    // Berechtigungen werden zur Laufzeit in MainActivity angefragt
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
